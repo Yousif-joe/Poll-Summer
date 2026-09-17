@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import type { Topic } from '@/lib/contacts'
 
@@ -17,7 +16,11 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return new Response('ANTHROPIC_API_KEY is not configured', { status: 503 })
+    const fallback =
+      'AI assistance is not currently configured. Please use the "Talk to an engineer" button to reach a support engineer directly.'
+    return new Response(fallback, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
   }
 
   // Fetch knowledge base for the topic from Supabase
@@ -45,13 +48,14 @@ Be concise, step-by-step when explaining processes, and professional. Do not mak
 
 ${knowledgeText || 'No knowledge entries are available for this topic yet. Direct the user to connect to a support engineer.'}`
 
+  const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const anthropic = new Anthropic({ apiKey })
 
   const stream = anthropic.messages.stream({
     model: process.env.CLAUDE_MODEL ?? 'claude-sonnet-5',
     max_tokens: 4096,
     system: systemPrompt,
-    messages: messages as Anthropic.MessageParam[],
+    messages: messages as { role: 'user' | 'assistant'; content: string }[],
   })
 
   const readable = new ReadableStream({
